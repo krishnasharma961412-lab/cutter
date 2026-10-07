@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cutter</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f5f7; --surface: #ffffff; --ink: #1d1d1f; --ink-2: #6e6e73; --ink-3: #a1a1a6;
+    --hairline: rgba(0, 0, 0, 0.1); --fill: rgba(120, 120, 128, 0.12); --fill-press: rgba(120, 120, 128, 0.22);
+    --accent: #0071e3; --accent-ink: #ffffff; --danger: #d70015;
+    --bar: rgba(245, 245, 247, 0.72); --bar-edge: rgba(255, 255, 255, 0.6);
+    --wave: rgba(29, 29, 31, 0.6); --wave-cut: rgba(29, 29, 31, 0.14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    --spring: cubic-bezier(0.32, 0.72, 0, 1);   /* critically damped feel, no overshoot */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --surface: #1c1c1e; --ink: #f5f5f7; --ink-2: #98989d; --ink-3: #636366;
+      --hairline: rgba(255, 255, 255, 0.12); --fill: rgba(120, 120, 128, 0.24); --fill-press: rgba(120, 120, 128, 0.4);
+      --accent: #0a84ff; --danger: #ff453a;
+      --bar: rgba(0, 0, 0, 0.6); --bar-edge: rgba(255, 255, 255, 0.08);
+      --wave: rgba(245, 245, 247, 0.7); --wave-cut: rgba(245, 245, 247, 0.16);
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { font: 100%/1.47 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
+
+  /* Buttons: feedback on press, instantly */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    height: 2.25rem; padding: 0 1rem; border-radius: 999px; font-size: 0.9375rem; font-weight: 500;
+    background: var(--fill); white-space: nowrap; transition: transform 100ms ease-out, background-color 100ms ease-out, opacity 200ms ease;
+  }
+  .btn:active { transform: scale(0.97); background: var(--fill-press); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.primary:active { filter: brightness(0.9); }
+  .btn.large { height: 3rem; padding: 0 1.75rem; font-size: 1.0625rem; }
+  .btn:disabled { opacity: 0.4; pointer-events: none; }
+  .icon-btn {
+    flex: none; width: 2.25rem; height: 2.25rem; border-radius: 50%; display: grid; place-items: center;
+    background: var(--fill); color: var(--accent); transition: transform 100ms ease-out, background-color 100ms ease-out, opacity 200ms ease;
+  }
+  .icon-btn:active { transform: scale(0.92); background: var(--fill-press); }
+  .icon-btn.quiet { background: none; color: var(--ink-3); }
+  .icon-btn.quiet:active { background: var(--fill); }
+  .icon-btn:disabled { opacity: 0.35; pointer-events: none; }
+  .icon-btn svg { width: 1rem; height: 1rem; fill: currentColor; }
+
+  /* Empty state */
+  #hero {
+    min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 2rem 1rem; text-align: center; cursor: pointer;
+  }
+  #hero h1 {
+    font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1.05; letter-spacing: -0.025em; font-weight: 700; margin: 0 0 1rem;
+    font-optical-sizing: auto;
+  }
+  #hero p { font-size: clamp(1.0625rem, 2.2vw, 1.375rem); line-height: 1.35; letter-spacing: -0.005em; color: var(--ink-2); margin: 0 auto 2rem; max-width: 30rem; }
+  #hero small { display: block; margin-top: 1.5rem; font-size: 0.8125rem; letter-spacing: 0.005em; color: var(--ink-3); }
+
+  /* Toolbar: a translucent layer the list scrolls under */
+  #toolbar {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bar); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--bar-edge);
+  }
+  #toolbar .inner { max-width: 46rem; margin: 0 auto; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  #toolbar .title { margin-right: auto; min-width: 0; }
+  #toolbar h2 { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; margin: 0; }
+  #summary { font-size: 0.8125rem; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* List */
+  main { max-width: 46rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
+  #list { background: var(--surface); border-radius: 1.125rem; box-shadow: var(--shadow); overflow: hidden; }
+  .row { position: relative; overflow: hidden; transition: height 350ms var(--spring), opacity 250ms ease; }
+  .row + .row::before { content: ""; position: absolute; top: 0; left: 4rem; right: 0; height: 1px; background: var(--hairline); }
+  .row .body { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 0.25rem 0.75rem; padding: 0.875rem 0.75rem 0.875rem 1rem; }
+  .row.entering .body { animation: enter 450ms var(--spring) both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(0.5rem); } }
+  .row .text { min-width: 0; }
+  .row .name { font-size: 1rem; font-weight: 500; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .meta { font-size: 0.8125rem; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row.error .meta { color: var(--danger); }
+  .row canvas {
+    grid-column: 2 / -1; width: 100%; height: 2.5rem; display: block; margin-top: 0.25rem;
+    touch-action: none; transition: opacity 300ms ease;
+  }
+  .row:not(.done) canvas { opacity: 0.45; }
+  .row.done canvas { cursor: pointer; }
+  .row.error canvas { display: none; }
+
+  .spinner { width: 1.125rem; height: 1.125rem; border-radius: 50%; border: 2px solid var(--fill-press); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Drop target covers the window; it materializes rather than just fading */
+  #dropzone {
+    position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; pointer-events: none;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); opacity: 0;
+    transition: opacity 200ms ease, backdrop-filter 300ms ease, -webkit-backdrop-filter 300ms ease;
+  }
+  #dropzone span {
+    font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: -0.02em;
+    transform: scale(0.94); transition: transform 350ms var(--spring);
+  }
+  body.dragging #dropzone { opacity: 1; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+  body.dragging #dropzone span { transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .row { transition: opacity 200ms ease; }
+    .row.entering .body { animation: fade 200ms ease both; }
+    @keyframes fade { from { opacity: 0; } }
+    .btn:active, .icon-btn:active { transform: none; }
+    #dropzone span { transform: none; transition: none; }
+    .spinner { animation-duration: 2.4s; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    #toolbar, #dropzone { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: var(--bg); }
+  }
+  @media (prefers-contrast: more) {
+    :root { --hairline: currentColor; --ink-2: var(--ink); --ink-3: var(--ink); }
+    #toolbar { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: currentColor; }
+    #list { outline: 1px solid currentColor; }
+  }
+</style>
+</head>
+<body>
+<input id="file" type="file" multiple accept="audio/*,video/mp4,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm" hidden>
+
+<section id="hero">
+  <div>
+    <h1>Remove the pauses.</h1>
+    <p>Drop in your audio files. Get them back without the silence.</p>
+    <button class="btn primary large" id="choose" type="button">Choose Files</button>
+    <small>MP3, WAV, M4A, AAC, OGG, FLAC · Processed on this device, nothing is uploaded</small>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header id="toolbar">
+    <div class="inner">
+      <div class="title">
+        <h2>Cutter</h2>
+        <div id="summary" aria-live="polite"></div>
+      </div>
+      <button class="btn" id="add" type="button">Add Files</button>
+      <button class="btn primary" id="downloadAll" type="button" disabled>Download All</button>
+    </div>
+  </header>
+  <main><div id="list"></div></main>
+</div>
+
+<div id="dropzone" aria-hidden="true"><span>Drop to remove pauses</span></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const WINDOW_SEC = 0.01;   // loudness is measured in 10 ms steps
+  const FADE_SEC = 0.005;    // short fade at each cut to avoid clicks
+  const MIN_PAUSE_SEC = 0.15; // pauses shorter than this are left alone
+  const PAD_SEC = 0.05;       // silence kept on each side of a cut, so every pause shrinks to about 0.1 s
+  const EDGE_MIN_SEC = 0.05;  // silence at the very start or end is trimmed from this length up
+  const EDGE_PAD_SEC = 0.03;  // ...leaving this much so the first and last sounds aren't clipped
+  const PEAK_COLS = 1400;
+  const SUFFIX = '.processed.wav';
+  const ICON = {
+    play: '<svg viewBox="0 0 16 16"><path d="M4.5 2.3v11.4a.6.6 0 0 0 .92.5l8.9-5.7a.6.6 0 0 0 0-1L5.42 1.8a.6.6 0 0 0-.92.5z"/></svg>',
+    pause: '<svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.6" height="12" rx="1"/><rect x="9.4" y="2" width="3.6" height="12" rx="1"/></svg>',
+    down: '<svg viewBox="0 0 16 16"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.4l2.3-2.3a.9.9 0 1 1 1.3 1.3l-3.9 3.8a.9.9 0 0 1-1.2 0L3.5 7.8a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9zM3 13.2h10a.9.9 0 0 1 0 1.8H3a.9.9 0 0 1 0-1.8z"/></svg>',
+    close: '<svg viewBox="0 0 16 16"><path d="M3.6 3.6a.9.9 0 0 1 1.3 0L8 6.7l3.1-3.1a.9.9 0 1 1 1.3 1.3L9.3 8l3.1 3.1a.9.9 0 1 1-1.3 1.3L8 9.3l-3.1 3.1a.9.9 0 1 1-1.3-1.3L6.7 8 3.6 4.9a.9.9 0 0 1 0-1.3z"/></svg>',
+    alert: '<svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 3.2c.5 0 .9.4.9.9v3.4a.9.9 0 0 1-1.8 0V5.100c0-.5.4-.9.9-.9zm0 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>',
+  };
+
+  let audioCtx = null;
+  let items = [];            // one entry per file, in list order
+  let running = false, nextId = 1;
+  let playing = null;        // the item whose result is currently playing
+
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const tick = () => new Promise(r => setTimeout(r));
+  const fmtTime = s => {
+    s = Math.max(0, s);
+    const m = Math.floor(s / 60), sec = s - m * 60;
+    return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(1);
+  };
+
+  // ---------- audio ----------
+
+  // RMS level in dBFS for each 10 ms window, across all channels.
+  function computeEnvelope(buf) {
+    const win = Math.max(1, Math.floor(buf.sampleRate * WINDOW_SEC));
+    const n = Math.ceil(buf.length / win);
+    const sum = new Float64Array(n);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let w = 0, i = 0; w < n; w++) {
+        const end = Math.min(i + win, d.length);
+        let s = 0;
+        for (; i < end; i++) s += d[i] * d[i];
+        sum[w] += s;
+      }
+    }
+    const db = new Float32Array(n);
+    const per = win * buf.numberOfChannels;
+    for (let w = 0; w < n; w++) db[w] = 10 * Math.log10(sum[w] / per + 1e-12);
+    return db;
+  }
+
+  // Picks the silence threshold for one recording: -45 dB, raised for a noisy
+  // room, but never closer than 20 dB to the loud passages so quiet speech survives.
+  function autoThreshold(db) {
+    const sorted = Float32Array.from(db).sort();
+    const at = p => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
+    const floor = at(0.05), loud = at(0.95);
+    return Math.min(Math.max(-45, floor + 8), loud - 20);
+  }
+
+  function computePeaks(buf, cols) {
+    const d = buf.getChannelData(0);
+    const peaks = new Float32Array(cols);
+    const step = d.length / cols;
+    let top = 1e-4;
+    for (let x = 0; x < cols; x++) {
+      const a = Math.floor(x * step), b = Math.min(d.length, Math.floor((x + 1) * step) + 1);
+      let hi = 0;
+      for (let i = a; i < b; i++) { const v = d[i] < 0 ? -d[i] : d[i]; if (v > hi) hi = v; }
+      peaks[x] = hi;
+      if (hi > top) top = hi;
+    }
+    for (let x = 0; x < cols; x++) peaks[x] /= top;
+    return peaks;
+  }
+
+  // Returns the sample ranges to remove.
+  function findCuts(sampleRate, length, db, thr) {
+    const win = Math.max(1, Math.floor(sampleRate * WINDOW_SEC));
+    const minWins = Math.max(1, Math.round(MIN_PAUSE_SEC / WINDOW_SEC));
+    const edgeWins = Math.max(1, Math.round(EDGE_MIN_SEC / WINDOW_SEC));
+    const pad = Math.round(PAD_SEC * sampleRate), edgePad = Math.round(EDGE_PAD_SEC * sampleRate);
+    const cuts = [];
+    let runStart = -1;
+    for (let w = 0; w <= db.length; w++) {
+      const silent = w < db.length && db[w] < thr;
+      if (silent) { if (runStart < 0) runStart = w; continue; }
+      if (runStart >= 0) {
+        const atStart = runStart === 0, atEnd = w === db.length;
+        if (w - runStart >= (atStart || atEnd ? edgeWins : minWins)) {
+          // Leading and trailing silence goes almost entirely; pauses in between keep a little air.
+          const a = atStart ? 0 : runStart * win + (atEnd ? edgePad : pad);
+          const b = atEnd ? length : Math.min(length, w * win) - (atStart ? edgePad : pad);
+          if (b > a) cuts.push([a, b]);
+        }
+        runStart = -1;
+      }
+    }
+    return cuts;
+  }
+
+  function keptSegments(length, cuts) {
+    const segs = [];
+    let pos = 0;
+    for (const [s, e] of cuts) { if (s > pos) segs.push([pos, s]); pos = e; }
+    if (pos < length) segs.push([pos, length]);
+    return segs;
+  }
+
+  function renderWav(buf, segs) {
+    const total = segs.reduce((n, [s, e]) => n + (e - s), 0);
+    const ch = buf.numberOfChannels, sr = buf.sampleRate;
+    const fade = Math.floor(sr * FADE_SEC);
+    const out = new DataView(new ArrayBuffer(44 + total * ch * 2));
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); out.setUint32(4, 36 + total * ch * 2, true); str(8, 'WAVE');
+    str(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, ch, true);
+    out.setUint32(24, sr, true); out.setUint32(28, sr * ch * 2, true); out.setUint16(32, ch * 2, true);
+    out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, total * ch * 2, true);
+
+    for (let c = 0; c < ch; c++) {
+      const d = buf.getChannelData(c);
+      let o = 44 + c * 2;
+      for (const [s, e] of segs) {
+        const len = e - s, f = Math.min(fade, len >> 1);
+        const fadeIn = s > 0, fadeOut = e < buf.length;
+        for (let i = 0; i < len; i++, o += ch * 2) {
+          let v = d[s + i];
+          if (fadeIn && i < f) v *= i / f;
+          else if (fadeOut && i >= len - f) v *= (len - 1 - i) / f;
+          v = v < -1 ? -1 : v > 1 ? 1 : v;
+          out.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+        }
+      }
+    }
+    return new Blob([out], { type: 'audio/wav' });
+  }
+
+  // ---------- zip (stored, no compression — WAV barely compresses anyway) ----------
+
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  // entries: [{name, blob}] -> zip Blob
+  async function makeZip(entries) {
+    const now = new Date();
+    const time = now.getHours() << 11 | now.getMinutes() << 5 | now.getSeconds() >> 1;
+    const date = (now.getFullYear() - 1980) << 9 | (now.getMonth() + 1) << 5 | now.getDate();
+    const parts = [], central = [];
+    let offset = 0;
+    for (const { name, blob } of entries) {
+      const nameBytes = new TextEncoder().encode(name);
+      const crc = crc32(new Uint8Array(await blob.arrayBuffer()));
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true);
+      local.setUint16(6, 0x0800, true);                 // UTF-8 file names
+      local.setUint16(10, time, true); local.setUint16(12, date, true);
+      local.setUint32(14, crc, true); local.setUint32(18, blob.size, true); local.setUint32(22, blob.size, true);
+      local.setUint16(26, nameBytes.length, true);
+      parts.push(local, nameBytes, blob);
+
+      const cd = new DataView(new ArrayBuffer(46));
+      cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+      cd.setUint16(8, 0x0800, true);
+      cd.setUint16(12, time, true); cd.setUint16(14, date, true);
+      cd.setUint32(16, crc, true); cd.setUint32(20, blob.size, true); cd.setUint32(24, blob.size, true);
+      cd.setUint16(28, nameBytes.length, true); cd.setUint32(42, offset, true);
+      central.push(cd, nameBytes);
+      offset += 30 + nameBytes.length + blob.size;
+    }
+    const cdSize = central.reduce((n, p) => n + p.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end], { type: 'application/zip' });
+  }
+
+  // ---------- list ----------
+
+  function addFiles(files) {
+    if (!files.length) return;
+    for (const file of files) {
+      const item = {
+        id: nextId++, file, base: file.name.replace(/\.[^.]+$/, '') || 'audio',
+        status: 'queued', meta: null, peaks: null, cuts: [], segs: [], blob: null, url: null, audio: null, playFrac: 0,
+      };
+      item.outName = uniqueName(item.base);
+      item.el = buildRow(item);
+      items.push(item);
+      $('list').append(item.el);
+      paint(item);
+    }
+    refresh();
+    pump();
+  }
+
+  // Two inputs with the same name must not overwrite each other in the zip.
+  function uniqueName(base) {
+    const taken = new Set(items.map(i => i.outName));
+    let name = base + SUFFIX;
+    for (let n = 2; taken.has(name); n++) name = base + ' (' + n + ')' + SUFFIX;
+    return name;
+  }
+
+  function buildRow(item) {
+    const el = document.createElement('div');
+    el.className = 'row entering';
+    el.innerHTML =
+      '<div class="body">' +
+        '<button class="icon-btn play" type="button"></button>' +
+        '<div class="text"><div class="name"></div><div class="meta"></div></div>' +
+        '<button class="icon-btn save" type="button">' + ICON.down + '</button>' +
+        '<button class="icon-btn quiet remove" type="button" aria-label="Remove">' + ICON.close + '</button>' +
+        '<canvas></canvas>' +
+      '</div>';
+    el.querySelector('.name').textContent = item.file.name;
+    el.querySelector('.save').setAttribute('aria-label', 'Download ' + item.outName);
+    el.querySelector('.save').title = item.outName;
+    el.querySelector('.play').addEventListener('click', () => togglePlay(item));
+    el.querySelector('.save').addEventListener('click', () => saveBlob(item.blob, item.outName));
+    el.querySelector('.remove').addEventListener('click', () => removeItem(item));
+    el.addEventListener('animationend', () => el.classList.remove('entering'), { once: true });
+    wireScrub(item, el.querySelector('canvas'));
+    return el;
+  }
+
+  function removeItem(item) {
+    if (playing === item) stopPlayback();
+    items = items.filter(i => i !== item);
+    item.removed = true;
+    if (item.url) URL.revokeObjectURL(item.url);
+    refresh();
+    const el = item.el;
+    if (reducedMotion.matches || !items.length) return el.remove();
+    // Collapse from the height it has on screen right now.
+    el.style.height = el.offsetHeight + 'px';
+    el.offsetHeight;
+    el.style.height = '0px';
+    el.style.opacity = '0';
+    el.addEventListener('transitionend', e => { if (e.propertyName === 'height') el.remove(); });
+  }
+
+  function paint(item) {
+    const el = item.el, play = el.querySelector('.play'), meta = el.querySelector('.meta');
+    el.classList.toggle('done', item.status === 'done');
+    el.classList.toggle('error', item.status === 'error');
+    el.querySelector('.save').disabled = item.status !== 'done';
+
+    if (item.status === 'done') {
+      const sr = item.meta.sampleRate, dur = item.meta.length / sr;
+      const cut = item.cuts.reduce((n, [s, e]) => n + (e - s), 0) / sr;
+      meta.textContent = fmtTime(dur) + ' → ' + fmtTime(dur - cut) + ' · ' +
+        (item.cuts.length ? item.cuts.length + (item.cuts.length === 1 ? ' pause removed' : ' pauses removed') : 'No pauses found');
+      play.disabled = false;
+      play.innerHTML = playing === item ? ICON.pause : ICON.play;
+      play.setAttribute('aria-label', playing === item ? 'Pause' : 'Play result');
+    } else if (item.status === 'error') {
+      meta.textContent = 'This file couldn’t be read as audio';
+      play.disabled = true; play.innerHTML = ICON.alert; play.style.color = 'var(--danger)';
+      play.setAttribute('aria-label', 'Failed');
+    } else {
+      meta.textContent = item.status === 'processing' ? 'Removing pauses…' : 'Waiting';
+      play.disabled = true;
+      play.innerHTML = item.status === 'processing' ? '<span class="spinner"></span>' : ICON.play;
+      play.setAttribute('aria-label', meta.textContent);
+    }
+    drawWave(item);
+  }
+
+  // Waveform of the original, with the removed stretches dimmed and the played part tinted.
+  function drawWave(item) {
+    const cv = item.el.querySelector('canvas');
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    const dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const css = getComputedStyle(document.documentElement);
+    const cKept = css.getPropertyValue('--wave'), cCut = css.getPropertyValue('--wave-cut'), cPlayed = css.getPropertyValue('--accent');
+    const BAR = 2, STEP = 4, n = Math.floor(w / STEP);
+    let ci = 0;
+    for (let j = 0; j < n; j++) {
+      let amp = 0;
+      if (item.peaks) {
+        const a = Math.floor(j * PEAK_COLS / n), b = Math.max(a + 1, Math.floor((j + 1) * PEAK_COLS / n));
+        for (let x = a; x < b; x++) if (item.peaks[x] > amp) amp = item.peaks[x];
+      }
+      const frac = (j + 0.5) / n;
+      let cut = false;
+      if (item.meta) {
+        const pos = frac * item.meta.length;
+        while (ci < item.cuts.length && item.cuts[ci][1] <= pos) ci++;
+        cut = ci < item.cuts.length && item.cuts[ci][0] <= pos;
+      }
+      g.fillStyle = cut ? cCut : frac <= item.playFrac ? cPlayed : cKept;
+      const bh = Math.max(2, amp * h);
+      g.beginPath();
+      if (g.roundRect) g.roundRect(j * STEP, (h - bh) / 2, BAR, bh, 1); else g.rect(j * STEP, (h - bh) / 2, BAR, bh);
+      g.fill();
+    }
+  }
+
+  function refresh() {
+    const empty = items.length === 0;
+    $('hero').hidden = !empty;
+    $('app').hidden = empty;
+    const done = items.filter(i => i.status === 'done').length;
+    const failed = items.filter(i => i.status === 'error').length;
+    const busy = items.some(i => i.status === 'queued' || i.status === 'processing');
+    $('summary').textContent = busy
+      ? 'Removing pauses · ' + done + ' of ' + items.length + ' done'
+      : done + (done === 1 ? ' file ready' : ' files ready') + (failed ? ' · ' + failed + ' failed' : '');
+    const btn = $('downloadAll');
+    btn.disabled = busy || done === 0;
+    btn.textContent = done === 1 && !busy ? 'Download' : 'Download All';
+  }
+
+  // ---------- processing queue: one file at a time, so memory stays bounded ----------
+
+  async function pump() {
+    if (running) return;
+    running = true;
+    let item;
+    while ((item = items.find(i => i.status === 'queued'))) {
+      await processItem(item);
+      refresh();
+    }
+    running = false;
+    refresh();
+  }
+
+  async function processItem(item) {
+    item.status = 'processing';
+    paint(item); refresh();
+    await tick();
+    let buf;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      buf = await audioCtx.decodeAudioData(await item.file.arrayBuffer());
+    } catch (e) {
+      item.status = 'error';
+      paint(item);
+      return;
+    }
+    const env = computeEnvelope(buf);
+    item.meta = { sampleRate: buf.sampleRate, length: buf.length };
+    item.peaks = computePeaks(buf, PEAK_COLS);
+    item.cuts = findCuts(buf.sampleRate, buf.length, env, autoThreshold(env));
+    item.segs = keptSegments(buf.length, item.cuts);
+    paint(item);
+    await tick();
+    const blob = renderWav(buf, item.segs);
+    if (item.removed) return;
+    item.blob = blob;
+    item.url = URL.createObjectURL(blob);
+    item.status = 'done';
+    paint(item);
+  }
+
+  // ---------- playback: the result plays, the playhead skips over what was removed ----------
+
+  function outToOrig(item, sec) {
+    let s = sec * item.meta.sampleRate;
+    for (const [a, b] of item.segs) { if (s < b - a) return (a + s) / item.meta.length; s -= b - a; }
+    return 1;
+  }
+
+  function origToOut(item, frac) {
+    const p = frac * item.meta.length;
+    let acc = 0;
+    for (const [a, b] of item.segs) {
+      if (p < a) break;
+      if (p < b) { acc += p - a; break; }
+      acc += b - a;
+    }
+    return acc / item.meta.sampleRate;
+  }
+
+  function ensureAudio(item) {
+    if (item.audio) return item.audio;
+    item.audio = new Audio(item.url);
+    item.audio.addEventListener('ended', () => { if (playing === item) { stopPlayback(); item.playFrac = 0; drawWave(item); } });
+    return item.audio;
+  }
+
+  function stopPlayback() {
+    const item = playing;
+    if (!item) return;
+    playing = null;
+    item.audio.pause();
+    if (!item.removed) paint(item);
+  }
+
+  function togglePlay(item) {
+    if (item.status !== 'done') return;
+    if (playing === item) return stopPlayback();
+    stopPlayback();
+    playing = item;
+    ensureAudio(item).play();
+    paint(item);
+    requestAnimationFrame(function frame() {
+      if (playing !== item) return;
+      item.playFrac = outToOrig(item, item.audio.currentTime);
+      drawWave(item);
+      requestAnimationFrame(frame);
+    });
+  }
+
+  // Scrubbing follows the pointer 1:1 from the moment it goes down.
+  function wireScrub(item, cv) {
+    const seek = e => {
+      const r = cv.getBoundingClientRect();
+      const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      const t = origToOut(item, frac);
+      ensureAudio(item).currentTime = t;
+      item.playFrac = outToOrig(item, t);
+      drawWave(item);
+    };
+    cv.addEventListener('pointerdown', e => {
+      if (item.status !== 'done') return;
+      cv.setPointerCapture(e.pointerId);
+      seek(e);
+      cv.addEventListener('pointermove', seek);
+    });
+    const end = () => cv.removeEventListener('pointermove', seek);
+    cv.addEventListener('pointerup', end);
+    cv.addEventListener('pointercancel', end);
+  }
+
+  // ---------- downloads ----------
+
+  function saveBlob(blob, name) {
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  async function downloadAll() {
+    const done = items.filter(i => i.status === 'done');
+    if (!done.length) return;
+    if (done.length === 1) return saveBlob(done[0].blob, done[0].outName);
+    const btn = $('downloadAll');
+    btn.disabled = true; btn.textContent = 'Preparing…';
+    await tick();
+    const zip = await makeZip(done.map(i => ({ name: i.outName, blob: i.blob })));
+    saveBlob(zip, 'processed-audio.zip');
+    refresh();
+  }
+
+  // ---------- wiring ----------
+
+  const fileInput = $('file');
+  const choose = () => fileInput.click();
+  $('hero').addEventListener('click', choose);
+  $('add').addEventListener('click', choose);
+  fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value = ''; });
+  $('downloadAll').addEventListener('click', downloadAll);
+
+  // Files can be dropped anywhere in the window.
+  let dragDepth = 0;
+  const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  window.addEventListener('dragenter', e => { if (hasFiles(e)) { dragDepth++; document.body.classList.add('dragging'); } });
+  window.addEventListener('dragleave', e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    e.preventDefault();
+    dragDepth = 0; document.body.classList.remove('dragging');
+    addFiles([...e.dataTransfer.files]);
+  });
+
+  const redrawAll = () => items.forEach(drawWave);
+  window.addEventListener('resize', redrawAll);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+
+  refresh();
+  window.pauseCutter = { addFiles, makeZip, items: () => items };   // handy for scripting from the console
+})();
+</script>
+</body>
+</html>
