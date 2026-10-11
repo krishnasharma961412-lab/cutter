@@ -9,8 +9,9 @@
     color-scheme: light dark;
     --bg: #f5f5f7; --surface: #ffffff; --ink: #1d1d1f; --ink-2: #6e6e73; --ink-3: #a1a1a6;
     --hairline: rgba(0, 0, 0, 0.1); --fill: rgba(120, 120, 128, 0.12); --fill-press: rgba(120, 120, 128, 0.22);
+    --seg-on: #ffffff;
     --accent: #0071e3; --accent-ink: #ffffff; --danger: #d70015;
-    --bar: rgba(245, 245, 247, 0.72); --bar-edge: rgba(255, 255, 255, 0.6);
+    --bar: rgba(245, 245, 247, 0.72); --bar-edge: rgba(0, 0, 0, 0.06);
     --wave: rgba(29, 29, 31, 0.6); --wave-cut: rgba(29, 29, 31, 0.14);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
     --spring: cubic-bezier(0.32, 0.72, 0, 1);   /* critically damped feel, no overshoot */
@@ -19,6 +20,7 @@
     :root {
       --bg: #000000; --surface: #1c1c1e; --ink: #f5f5f7; --ink-2: #98989d; --ink-3: #636366;
       --hairline: rgba(255, 255, 255, 0.12); --fill: rgba(120, 120, 128, 0.24); --fill-press: rgba(120, 120, 128, 0.4);
+      --seg-on: #636366;
       --accent: #0a84ff; --danger: #ff453a;
       --bar: rgba(0, 0, 0, 0.6); --bar-edge: rgba(255, 255, 255, 0.08);
       --wave: rgba(245, 245, 247, 0.7); --wave-cut: rgba(245, 245, 247, 0.16);
@@ -27,7 +29,7 @@
   }
   * { box-sizing: border-box; }
   html { font: 100%/1.47 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  body { margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
   button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   [hidden] { display: none !important; }
   :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
@@ -53,47 +55,69 @@
   .icon-btn:disabled { opacity: 0.35; pointer-events: none; }
   .icon-btn svg { width: 1rem; height: 1rem; fill: currentColor; }
 
-  /* Empty state */
-  #hero {
-    min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 2rem 1rem; text-align: center; cursor: pointer;
-  }
-  #hero h1 {
-    font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1.05; letter-spacing: -0.025em; font-weight: 700; margin: 0 0 1rem;
-    font-optical-sizing: auto;
-  }
-  #hero p { font-size: clamp(1.0625rem, 2.2vw, 1.375rem); line-height: 1.35; letter-spacing: -0.005em; color: var(--ink-2); margin: 0 auto 2rem; max-width: 30rem; }
-  #hero small { display: block; margin-top: 1.5rem; font-size: 0.8125rem; letter-spacing: 0.005em; color: var(--ink-3); }
-
-  /* Toolbar: a translucent layer the list scrolls under */
+  /* Top bar: a translucent layer the page scrolls under */
   #toolbar {
     position: sticky; top: 0; z-index: 10;
     background: var(--bar); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid var(--bar-edge);
   }
-  #toolbar .inner { max-width: 46rem; margin: 0 auto; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
-  #toolbar .title { margin-right: auto; min-width: 0; }
+  #toolbar .inner {
+    max-width: 60rem; margin: 0 auto; padding: 0.625rem 1rem; display: grid; align-items: center; gap: 0.5rem 0.75rem;
+    grid-template-columns: 1fr auto 1fr; grid-template-areas: "title seg actions";
+  }
+  #toolbar .title { grid-area: title; min-width: 0; }
   #toolbar h2 { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; margin: 0; }
   #summary { font-size: 0.8125rem; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #toolbar .actions { grid-area: actions; display: flex; gap: 0.5rem; justify-content: flex-end; min-height: 2.25rem; }
+  @media (max-width: 46rem) {
+    #toolbar .inner { grid-template-columns: 1fr auto; grid-template-areas: "title actions" "seg seg"; }
+    .seg { justify-self: stretch; }
+    .seg button { flex: 1; }
+  }
+
+  /* Which tool new files go to */
+  .seg { grid-area: seg; display: inline-flex; padding: 2px; border-radius: 999px; background: var(--fill); }
+  .seg button {
+    height: 2rem; padding: 0 1rem; border-radius: 999px; font-size: 0.875rem; font-weight: 500; color: var(--ink-2); white-space: nowrap;
+    transition: background-color 150ms ease-out, color 150ms ease-out, transform 100ms ease-out;
+  }
+  .seg button:active { transform: scale(0.97); }
+  .seg button[aria-selected="true"] { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+
+  /* Empty state */
+  #hero { flex: 1; display: grid; place-items: center; padding: 2rem 1rem 4rem; text-align: center; cursor: pointer; }
+  #hero h1 {
+    font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1.05; letter-spacing: -0.025em; font-weight: 700; margin: 0 0 1rem;
+    font-optical-sizing: auto;
+  }
+  #hero p { font-size: clamp(1.0625rem, 2.2vw, 1.375rem); line-height: 1.35; letter-spacing: -0.005em; color: var(--ink-2); margin: 0 auto 2rem; max-width: 32rem; }
+  #hero small { display: block; margin-top: 1.5rem; font-size: 0.8125rem; letter-spacing: 0.005em; color: var(--ink-3); }
 
   /* List */
-  main { max-width: 46rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
+  main { width: 100%; max-width: 46rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
   #list { background: var(--surface); border-radius: 1.125rem; box-shadow: var(--shadow); overflow: hidden; }
   .row { position: relative; overflow: hidden; transition: height 350ms var(--spring), opacity 250ms ease; }
-  .row + .row::before { content: ""; position: absolute; top: 0; left: 4rem; right: 0; height: 1px; background: var(--hairline); }
-  .row .body { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 0.25rem 0.75rem; padding: 0.875rem 0.75rem 0.875rem 1rem; }
+  .row + .row::before { content: ""; position: absolute; top: 0; left: 1rem; right: 0; height: 1px; background: var(--hairline); }
+  .row .body { padding: 0.875rem 0.75rem 0.875rem 1rem; }
   .row.entering .body { animation: enter 450ms var(--spring) both; }
   @keyframes enter { from { opacity: 0; transform: translateY(0.5rem); } }
-  .row .text { min-width: 0; }
+  .row .head { display: flex; align-items: center; gap: 0.625rem; }
+  .row .text { min-width: 0; flex: 1; }
   .row .name { font-size: 1rem; font-weight: 500; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .meta { font-size: 0.8125rem; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row.error .meta { color: var(--danger); }
-  .row canvas {
-    grid-column: 2 / -1; width: 100%; height: 2.5rem; display: block; margin-top: 0.25rem;
-    touch-action: none; transition: opacity 300ms ease;
-  }
-  .row:not(.done) canvas { opacity: 0.45; }
-  .row.done canvas { cursor: pointer; }
-  .row.error canvas { display: none; }
+  .row.error .meta { color: var(--danger); white-space: normal; }
+  .row .spinner { flex: none; }
+  .row:not(.processing) .spinner { display: none; }
+  .row .progress { height: 3px; border-radius: 2px; background: var(--fill); overflow: hidden; margin: 0.625rem 0.25rem 0 0; }
+  .row .progress i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width 300ms ease-out; }
+  .row .tracks { transition: opacity 300ms ease; }
+  .row:not(.done) .tracks { opacity: 0.4; }
+  .row.error .tracks { display: none; }
+  .track { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.625rem; }
+  .track .lane { flex: 1; min-width: 0; }
+  .track .label { display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-2); margin-bottom: 0.125rem; }
+  .track canvas { width: 100%; height: 2.5rem; display: block; touch-action: none; }
+  .row.done .track canvas { cursor: pointer; }
 
   .spinner { width: 1.125rem; height: 1.125rem; border-radius: 50%; border: 2px solid var(--fill-press); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -116,7 +140,7 @@
     .row { transition: opacity 200ms ease; }
     .row.entering .body { animation: fade 200ms ease both; }
     @keyframes fade { from { opacity: 0; } }
-    .btn:active, .icon-btn:active { transform: none; }
+    .btn:active, .icon-btn:active, .seg button:active { transform: none; }
     #dropzone span { transform: none; transition: none; }
     .spinner { animation-duration: 2.4s; }
   }
@@ -126,61 +150,84 @@
   @media (prefers-contrast: more) {
     :root { --hairline: currentColor; --ink-2: var(--ink); --ink-3: var(--ink); }
     #toolbar { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom-color: currentColor; }
-    #list { outline: 1px solid currentColor; }
+    #list, .seg { outline: 1px solid currentColor; }
   }
 </style>
 </head>
 <body>
-<input id="file" type="file" multiple accept="audio/*,video/mp4,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm" hidden>
+<input id="file" type="file" multiple accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm,.mp4,.mov,.m4v" hidden>
+
+<header id="toolbar">
+  <div class="inner">
+    <div class="title">
+      <h2>Cutter</h2>
+      <div id="summary" aria-live="polite"></div>
+    </div>
+    <div class="seg" role="tablist" aria-label="Tool">
+      <button type="button" role="tab" data-mode="pauses" aria-selected="true">Remove Pauses</button>
+      <button type="button" role="tab" data-mode="stems" aria-selected="false">Split Vocals</button>
+    </div>
+    <div class="actions">
+      <button class="btn" id="add" type="button" hidden>Add Files</button>
+      <button class="btn primary" id="downloadAll" type="button" hidden disabled>Download All</button>
+    </div>
+  </div>
+</header>
 
 <section id="hero">
   <div>
-    <h1>Remove the pauses.</h1>
-    <p>Drop in your audio files. Get them back without the silence.</p>
+    <h1 id="heroTitle"></h1>
+    <p id="heroText"></p>
     <button class="btn primary large" id="choose" type="button">Choose Files</button>
-    <small>MP3, WAV, M4A, AAC, OGG, FLAC · Processed on this device, nothing is uploaded</small>
+    <small id="heroNote"></small>
   </div>
 </section>
 
-<div id="app" hidden>
-  <header id="toolbar">
-    <div class="inner">
-      <div class="title">
-        <h2>Cutter</h2>
-        <div id="summary" aria-live="polite"></div>
-      </div>
-      <button class="btn" id="add" type="button">Add Files</button>
-      <button class="btn primary" id="downloadAll" type="button" disabled>Download All</button>
-    </div>
-  </header>
-  <main><div id="list"></div></main>
-</div>
+<main id="app" hidden><div id="list"></div></main>
 
-<div id="dropzone" aria-hidden="true"><span>Drop to remove pauses</span></div>
+<div id="dropzone" aria-hidden="true"><span id="dropText"></span></div>
 
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const WINDOW_SEC = 0.01;   // loudness is measured in 10 ms steps
-  const FADE_SEC = 0.005;    // short fade at each cut to avoid clicks
+  const WINDOW_SEC = 0.01;    // loudness is measured in 10 ms steps
+  const FADE_SEC = 0.005;     // short fade at each cut to avoid clicks
   const MIN_PAUSE_SEC = 0.15; // pauses shorter than this are left alone
   const PAD_SEC = 0.05;       // silence kept on each side of a cut, so every pause shrinks to about 0.1 s
   const EDGE_MIN_SEC = 0.05;  // silence at the very start or end is trimmed from this length up
   const EDGE_PAD_SEC = 0.03;  // ...leaving this much so the first and last sounds aren't clipped
   const PEAK_COLS = 1400;
-  const SUFFIX = '.processed.wav';
+  const STEM_RATE = 44100;    // the separation model was trained on 44.1 kHz audio
+  const FORCE_CPU = new URLSearchParams(location.search).has('cpu');   // add ?cpu to the address to skip the GPU
   const ICON = {
     play: '<svg viewBox="0 0 16 16"><path d="M4.5 2.3v11.4a.6.6 0 0 0 .92.5l8.9-5.7a.6.6 0 0 0 0-1L5.42 1.8a.6.6 0 0 0-.92.5z"/></svg>',
     pause: '<svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.6" height="12" rx="1"/><rect x="9.4" y="2" width="3.6" height="12" rx="1"/></svg>',
-    down: '<svg viewBox="0 0 16 16"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.4l2.3-2.3a.9.9 0 1 1 1.3 1.3l-3.9 3.8a.9.9 0 0 1-1.2 0L3.5 7.8a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9zM3 13.2h10a.9.9 0 0 1 0 1.8H3a.9.9 0 0 1 0-1.8z"/></svg>',
+    down: '<svg viewBox="0 0 16 16"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.4l2.3-2.3a.9.9 0 1 1 1.3 1.3l-3.9 3.8a.9.9 0 0 1-1.2 0L3.5 7.800a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9zM3 13.2h10a.9.9 0 0 1 0 1.8H3a.9.9 0 0 1 0-1.8z"/></svg>',
     close: '<svg viewBox="0 0 16 16"><path d="M3.6 3.6a.9.9 0 0 1 1.3 0L8 6.7l3.1-3.1a.9.9 0 1 1 1.3 1.3L9.3 8l3.1 3.1a.9.9 0 1 1-1.3 1.3L8 9.3l-3.1 3.1a.9.9 0 1 1-1.3-1.3L6.7 8 3.6 4.9a.9.9 0 0 1 0-1.3z"/></svg>',
-    alert: '<svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 3.2c.5 0 .9.4.9.9v3.4a.9.9 0 0 1-1.8 0V5.100c0-.5.4-.9.9-.9zm0 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>',
+  };
+  // The two tools. New files go to whichever one is selected in the top bar.
+  const MODES = {
+    pauses: {
+      title: 'Remove the pauses.',
+      text: 'Drop in your audio files. Get them back without the silence.',
+      note: 'MP3, WAV, M4A, AAC, OGG, FLAC · Processed on this device, nothing is uploaded',
+      drop: 'Drop to remove pauses',
+      tracks: [{ key: 'result', label: '', suffix: '.processed.wav' }],
+    },
+    stems: {
+      title: 'Split voice from music.',
+      text: 'Drop in a song or a video. Get the vocals and the music as separate files.',
+      note: 'Audio or video · Processed on this device, nothing is uploaded · One-time 67 MB model download',
+      drop: 'Drop to split vocals and music',
+      tracks: [{ key: 'vocals', label: 'Vocals', suffix: '.vocals.wav' }, { key: 'music', label: 'Music', suffix: '.music.wav' }],
+    },
   };
 
   let audioCtx = null;
+  let mode = 'pauses';
   let items = [];            // one entry per file, in list order
   let running = false, nextId = 1;
-  let playing = null;        // the item whose result is currently playing
+  let playing = null;        // the track currently playing
 
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const tick = () => new Promise(r => setTimeout(r));
@@ -190,7 +237,7 @@
     return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(1);
   };
 
-  // ---------- audio ----------
+  // ---------- pause removal ----------
 
   // RMS level in dBFS for each 10 ms window, across all channels.
   function computeEnvelope(buf) {
@@ -221,20 +268,23 @@
     return Math.min(Math.max(-45, floor + 8), loud - 20);
   }
 
-  function computePeaks(buf, cols) {
-    const d = buf.getChannelData(0);
+  // Largest absolute sample in each of `cols` equal slices.
+  function computePeaks(d, cols) {
     const peaks = new Float32Array(cols);
     const step = d.length / cols;
-    let top = 1e-4;
     for (let x = 0; x < cols; x++) {
       const a = Math.floor(x * step), b = Math.min(d.length, Math.floor((x + 1) * step) + 1);
       let hi = 0;
       for (let i = a; i < b; i++) { const v = d[i] < 0 ? -d[i] : d[i]; if (v > hi) hi = v; }
       peaks[x] = hi;
-      if (hi > top) top = hi;
     }
-    for (let x = 0; x < cols; x++) peaks[x] /= top;
     return peaks;
+  }
+
+  function normalizePeaks(list) {
+    let top = 1e-4;
+    for (const p of list) for (let x = 0; x < p.length; x++) if (p[x] > top) top = p[x];
+    for (const p of list) for (let x = 0; x < p.length; x++) p[x] /= top;
   }
 
   // Returns the sample ranges to remove.
@@ -270,23 +320,25 @@
     return segs;
   }
 
-  function renderWav(buf, segs) {
+  // 16-bit PCM WAV of the given stretches of `chans` (all of it by default), with a short fade at each join.
+  function encodeWav(chans, sampleRate, segs) {
+    const length = chans[0].length, ch = chans.length;
+    segs = segs || [[0, length]];
     const total = segs.reduce((n, [s, e]) => n + (e - s), 0);
-    const ch = buf.numberOfChannels, sr = buf.sampleRate;
-    const fade = Math.floor(sr * FADE_SEC);
+    const fade = Math.floor(sampleRate * FADE_SEC);
     const out = new DataView(new ArrayBuffer(44 + total * ch * 2));
     const str = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
     str(0, 'RIFF'); out.setUint32(4, 36 + total * ch * 2, true); str(8, 'WAVE');
     str(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, ch, true);
-    out.setUint32(24, sr, true); out.setUint32(28, sr * ch * 2, true); out.setUint16(32, ch * 2, true);
+    out.setUint32(24, sampleRate, true); out.setUint32(28, sampleRate * ch * 2, true); out.setUint16(32, ch * 2, true);
     out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, total * ch * 2, true);
 
     for (let c = 0; c < ch; c++) {
-      const d = buf.getChannelData(c);
+      const d = chans[c];
       let o = 44 + c * 2;
       for (const [s, e] of segs) {
         const len = e - s, f = Math.min(fade, len >> 1);
-        const fadeIn = s > 0, fadeOut = e < buf.length;
+        const fadeIn = s > 0, fadeOut = e < length;
         for (let i = 0; i < len; i++, o += ch * 2) {
           let v = d[s + i];
           if (fadeIn && i < f) v *= i / f;
@@ -297,6 +349,353 @@
       }
     }
     return new Blob([out], { type: 'audio/wav' });
+  }
+
+  async function processPauses(item) {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    let buf;
+    try { buf = await audioCtx.decodeAudioData(await item.file.arrayBuffer()); }
+    catch (e) { throw new Error('This file couldn’t be read as audio'); }
+    const track = item.tracks[0];
+    const env = computeEnvelope(buf);
+    track.sampleRate = buf.sampleRate;
+    track.length = buf.length;
+    track.peaks = computePeaks(buf.getChannelData(0), PEAK_COLS);
+    normalizePeaks([track.peaks]);
+    track.cuts = findCuts(buf.sampleRate, buf.length, env, autoThreshold(env));
+    track.segs = keptSegments(buf.length, track.cuts);
+    paint(item);
+    await tick();
+    const chans = [];
+    for (let c = 0; c < buf.numberOfChannels; c++) chans.push(buf.getChannelData(c));
+    track.blob = encodeWav(chans, buf.sampleRate, track.segs);
+    const dur = buf.length / buf.sampleRate, cut = track.cuts.reduce((n, [s, e]) => n + (e - s), 0) / buf.sampleRate;
+    item.meta = fmtTime(dur) + ' → ' + fmtTime(dur - cut) + ' · ' +
+      (track.cuts.length ? track.cuts.length + (track.cuts.length === 1 ? ' pause removed' : ' pauses removed') : 'No pauses found');
+  }
+
+  // ---------- vocal / music separation ----------
+  //
+  // A neural network (MDX-Net, the "Kim Vocal 2" model from the Ultimate Vocal Remover
+  // project) predicts the spectrogram of the voice from the spectrogram of the mix.
+  // It runs in a worker with ONNX Runtime: on the GPU through WebGPU where the browser
+  // has it, otherwise on the CPU through WebAssembly. Music is the mix minus the voice.
+  // Everything in this function is the worker; it shares nothing with the page.
+  function separatorWorker() {
+    const ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
+    const MODEL_URL = 'https://huggingface.co/seanghay/uvr_models/resolve/main/Kim_Vocal_2.onnx';
+    const MODEL_BYTES = 66759214;
+    // The model's fixed geometry: 7680-point FFT, 1024 hop, lowest 3072 bins, 256 frames per pass.
+    const N = 7680, HOP = 1024, DIM_F = 3072, DIM_T = 256, COMPENSATE = 1.009;
+    const CHUNK = HOP * (DIM_T - 1);   // samples covered by one pass
+    const TRIM = N / 2;                // edges of each pass are thrown away
+    const GEN = CHUNK - 2 * TRIM;      // samples kept from each pass
+    const M = 16384;                   // power of two used to compute the 7680-point FFT
+
+    importScripts(ORT + 'ort.webgpu.min.js');
+    ort.env.wasm.wasmPaths = ORT;
+    ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(8, navigator.hardwareConcurrency || 4) : 1;
+    ort.env.logLevel = 'error';
+
+    let session = null, backend = '', modelBytes = null;
+    const say = (type, data) => postMessage(Object.assign({ type }, data));
+
+    async function fetchModel() {
+      let cache = null;
+      try {
+        cache = await caches.open('cutter-models-v1');
+        const hit = await cache.match(MODEL_URL);
+        if (hit) return new Uint8Array(await hit.arrayBuffer());
+      } catch (e) { /* no cache storage here; download every time */ }
+      const res = await fetch(MODEL_URL);
+      if (!res.ok) throw new Error('model download failed (' + res.status + ')');
+      const total = +res.headers.get('Content-Length') || MODEL_BYTES;
+      const reader = res.body.getReader(), parts = [];
+      for (let got = 0;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value);
+        got += value.length;
+        say('progress', { stage: 'model', value: Math.min(1, got / total) });
+      }
+      const blob = new Blob(parts);
+      try { if (cache) await cache.put(MODEL_URL, new Response(blob)); } catch (e) { /* quota; fine */ }
+      return new Uint8Array(await blob.arrayBuffer());
+    }
+
+    async function openSession(provider) {
+      session = await ort.InferenceSession.create(modelBytes.slice(), { executionProviders: [provider], graphOptimizationLevel: 'all' });
+      backend = provider;
+    }
+
+    async function ensureSession(cpuOnly) {
+      if (session) return;
+      say('progress', { stage: 'model', value: 0 });
+      modelBytes = await fetchModel();
+      say('progress', { stage: 'load' });
+      if (navigator.gpu && !cpuOnly) {
+        try { return await openSession('webgpu'); } catch (e) { /* no usable GPU; use the CPU */ }
+      }
+      await openSession('wasm');
+    }
+
+    async function infer(data) {
+      const input = new ort.Tensor('float32', data, [1, 4, DIM_F, DIM_T]);
+      const out = await session.run({ [session.inputNames[0]]: input });
+      return out[session.outputNames[0]].data;
+    }
+
+    // --- FFT of length N (not a power of two) by Bluestein's method on a radix-2 FFT of length M ---
+    const cosT = new Float64Array(M / 2), sinT = new Float64Array(M / 2), rev = new Uint32Array(M);
+    for (let k = 0; k < M / 2; k++) { cosT[k] = Math.cos(-2 * Math.PI * k / M); sinT[k] = Math.sin(-2 * Math.PI * k / M); }
+    for (let i = 0, bits = Math.log2(M); i < M; i++) {
+      let r = 0;
+      for (let b = 0; b < bits; b++) r |= ((i >> b) & 1) << (bits - 1 - b);
+      rev[i] = r;
+    }
+    function fft(re, im) {
+      for (let i = 0; i < M; i++) {
+        const j = rev[i];
+        if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+      }
+      for (let size = 2; size <= M; size <<= 1) {
+        const half = size >> 1, step = M / size;
+        for (let i = 0; i < M; i += size) {
+          for (let j = 0, k = 0; j < half; j++, k += step) {
+            const a = i + j, b = a + half;
+            const tr = re[b] * cosT[k] - im[b] * sinT[k], ti = re[b] * sinT[k] + im[b] * cosT[k];
+            re[b] = re[a] - tr; im[b] = im[a] - ti;
+            re[a] += tr; im[a] += ti;
+          }
+        }
+      }
+    }
+    const chirpR = new Float64Array(N), chirpI = new Float64Array(N);   // e^(-i*pi*n^2/N)
+    const kernR = new Float64Array(M), kernI = new Float64Array(M);     // FFT of the conjugate chirp
+    for (let n = 0; n < N; n++) {
+      const ang = Math.PI * ((n * n) % (2 * N)) / N;
+      chirpR[n] = Math.cos(ang); chirpI[n] = -Math.sin(ang);
+      kernR[n] = chirpR[n]; kernI[n] = -chirpI[n];
+      if (n) { kernR[M - n] = kernR[n]; kernI[M - n] = kernI[n]; }
+    }
+    fft(kernR, kernI);
+    const wr = new Float64Array(M), wi = new Float64Array(M);
+    // In-place DFT of the first N entries of (xr, xi).
+    function dft(xr, xi, inverse) {
+      const sign = inverse ? -1 : 1;
+      wr.fill(0); wi.fill(0);
+      for (let n = 0; n < N; n++) {
+        const a = xr[n], b = sign * xi[n];
+        wr[n] = a * chirpR[n] - b * chirpI[n];
+        wi[n] = a * chirpI[n] + b * chirpR[n];
+      }
+      fft(wr, wi);
+      for (let k = 0; k < M; k++) {
+        const a = wr[k], b = wi[k];
+        wr[k] = a * kernR[k] - b * kernI[k];
+        wi[k] = -(a * kernI[k] + b * kernR[k]);   // conjugated, so the next forward FFT acts as an inverse
+      }
+      fft(wr, wi);
+      const scale = inverse ? 1 / (M * N) : 1 / M;
+      for (let k = 0; k < N; k++) {
+        const a = wr[k] * scale, b = -wi[k] * scale;
+        xr[k] = a * chirpR[k] - b * chirpI[k];
+        xi[k] = sign * (a * chirpI[k] + b * chirpR[k]);
+      }
+    }
+
+    // --- spectrogram in, spectrogram out ---
+    const win = new Float64Array(N);
+    for (let n = 0; n < N; n++) win[n] = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / N);
+    const PADDED = CHUNK + N;
+    const envelope = new Float64Array(PADDED);   // summed squared windows, to undo the overlap
+    for (let t = 0; t < DIM_T; t++) for (let n = 0; n < N; n++) envelope[t * HOP + n] += win[n] * win[n];
+    const padL = new Float32Array(PADDED), padR = new Float32Array(PADDED);
+    const accL = new Float64Array(PADDED), accR = new Float64Array(PADDED);
+    const fr = new Float64Array(N), fi = new Float64Array(N);
+    const PLANE = DIM_F * DIM_T;
+
+    function reflectPad(src, start, dst) {
+      for (let i = 0; i < PADDED; i++) {
+        let j = i - N / 2;
+        if (j < 0) j = -j; else if (j >= CHUNK) j = 2 * CHUNK - 2 - j;
+        dst[i] = src[start + j];
+      }
+    }
+
+    // Both channels go through one complex FFT: left in the real part, right in the imaginary part.
+    function forward(mixL, mixR, start, data) {
+      reflectPad(mixL, start, padL); reflectPad(mixR, start, padR);
+      for (let t = 0; t < DIM_T; t++) {
+        const o = t * HOP;
+        for (let n = 0; n < N; n++) { fr[n] = padL[o + n] * win[n]; fi[n] = padR[o + n] * win[n]; }
+        dft(fr, fi, false);
+        for (let f = 0; f < DIM_F; f++) {
+          const g = f ? N - f : 0, i = f * DIM_T + t;
+          data[i] = (fr[f] + fr[g]) / 2;                // left, real
+          data[PLANE + i] = (fi[f] - fi[g]) / 2;        // left, imaginary
+          data[2 * PLANE + i] = (fi[f] + fi[g]) / 2;    // right, real
+          data[3 * PLANE + i] = (fr[g] - fr[f]) / 2;    // right, imaginary
+        }
+      }
+    }
+
+    function inverse(spec, outL, outR, start) {
+      accL.fill(0); accR.fill(0);
+      fr.fill(0); fi.fill(0);   // bins above DIM_F stay zero
+      for (let t = 0; t < DIM_T; t++) {
+        fr[0] = spec[t]; fi[0] = spec[2 * PLANE + t];
+        for (let f = 1; f < DIM_F; f++) {
+          const i = f * DIM_T + t;
+          const lr = spec[i], li = spec[PLANE + i], rr = spec[2 * PLANE + i], ri = spec[3 * PLANE + i];
+          fr[f] = lr - ri; fi[f] = li + rr;
+          fr[N - f] = lr + ri; fi[N - f] = rr - li;
+        }
+        dft(fr, fi, true);
+        const o = t * HOP;
+        for (let n = 0; n < N; n++) { accL[o + n] += fr[n] * win[n]; accR[o + n] += fi[n] * win[n]; }
+        // dft worked in place, so clear what it left above DIM_F before the next frame.
+        fr.fill(0, DIM_F, N - DIM_F + 1); fi.fill(0, DIM_F, N - DIM_F + 1);
+      }
+      for (let i = 0, p = N / 2 + TRIM; i < GEN; i++, p++) {
+        outL[start + i] = accL[p] / envelope[p] * COMPENSATE;
+        outR[start + i] = accR[p] / envelope[p] * COMPENSATE;
+      }
+    }
+
+    async function separate(left, right, cpuOnly) {
+      await ensureSession(cpuOnly);
+      const n = left.length;
+      const pad = (GEN - n % GEN) % GEN;
+      const passes = Math.max(1, (n + pad) / GEN);
+      const mixL = new Float32Array(TRIM + passes * GEN + TRIM), mixR = new Float32Array(mixL.length);
+      mixL.set(left, TRIM); mixR.set(right, TRIM);
+      const outL = new Float32Array(passes * GEN), outR = new Float32Array(passes * GEN);
+      const data = new Float32Array(4 * PLANE), flipped = new Float32Array(4 * PLANE);
+      say('progress', { stage: 'separate', value: 0, backend });
+      for (let c = 0; c < passes; c++) {
+        forward(mixL, mixR, c * GEN, data);
+        let spec;
+        try {
+          spec = await infer(data);
+          if (backend === 'webgpu') {
+            // The network leaves a faint noise floor; running it on the inverted mix
+            // too and averaging cancels it. Only where the GPU makes a second pass cheap.
+            for (let i = 0; i < data.length; i++) flipped[i] = -data[i];
+            const neg = await infer(flipped);
+            const avg = new Float32Array(spec.length);
+            for (let i = 0; i < avg.length; i++) avg[i] = (spec[i] - neg[i]) / 2;
+            spec = avg;
+          }
+        } catch (e) {
+          if (backend !== 'webgpu') throw e;
+          await openSession('wasm');   // the GPU path failed on this machine; redo this pass on the CPU
+          c--;
+          continue;
+        }
+        inverse(spec, outL, outR, c * GEN);
+        say('progress', { stage: 'separate', value: (c + 1) / passes, backend });
+      }
+      return [outL.slice(0, n), outR.slice(0, n)];
+    }
+
+    onmessage = async e => {
+      try {
+        const [l, r] = await separate(e.data.left, e.data.right, e.data.cpuOnly);
+        postMessage({ type: 'done', left: l, right: r, backend }, [l.buffer, r.buffer]);
+      } catch (err) {
+        say('error', { message: String(err && err.message || err) });
+      }
+    };
+  }
+
+  const separator = {
+    worker: null, job: null,
+    run(left, right, onProgress) {
+      if (!this.worker) {
+        const src = URL.createObjectURL(new Blob(['(' + separatorWorker + ')()'], { type: 'text/javascript' }));
+        this.worker = new Worker(src);
+        this.worker.onmessage = e => {
+          const m = e.data, job = this.job;
+          if (!job) return;
+          if (m.type === 'progress') return job.onProgress(m);
+          this.job = null;
+          if (m.type === 'done') job.resolve(m); else job.reject(new Error(m.message));
+        };
+        this.worker.onerror = e => {
+          // The worker never started (usually the runtime script could not be loaded).
+          const job = this.job;
+          this.job = null; this.worker = null;
+          if (job) job.reject(new Error(e.message || 'worker failed to start'));
+        };
+      }
+      return new Promise((resolve, reject) => {
+        this.job = { resolve, reject, onProgress };
+        this.worker.postMessage({ left, right, cpuOnly: FORCE_CPU }, [left.buffer, right.buffer]);
+      });
+    },
+  };
+
+  // Decodes straight to 44.1 kHz; if the browser ignores the requested rate, resamples.
+  async function decodeAt(bytes, rate) {
+    const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const buf = await new Offline(2, 1, rate).decodeAudioData(bytes);
+    if (buf.sampleRate === rate) return buf;
+    const ctx = new Offline(buf.numberOfChannels, Math.ceil(buf.duration * rate), rate);
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.connect(ctx.destination); src.start();
+    return ctx.startRendering();
+  }
+
+  async function processStems(item) {
+    let buf;
+    try { buf = await decodeAt(await item.file.arrayBuffer(), STEM_RATE); }
+    catch (e) { throw new Error('This file couldn’t be read as audio'); }
+    const stereo = buf.numberOfChannels > 1;
+    const mixL = buf.getChannelData(0), mixR = stereo ? buf.getChannelData(1) : mixL;
+
+    let res;
+    try {
+      res = await separator.run(mixL.slice(), mixR.slice(), p => {
+        if (p.stage === 'model') { item.note = 'Downloading the separation model, first time only… ' + Math.round(p.value * 100) + '%'; item.progress = p.value; }
+        else if (p.stage === 'load') { item.note = 'Starting the separation model…'; item.progress = null; }
+        else {
+          item.note = 'Separating vocals and music… ' + Math.round(p.value * 100) + '%' +
+            (p.backend === 'wasm' ? ' · No GPU support in this browser, so this is slow' : '');
+          item.progress = p.value;
+        }
+        paint(item);
+      });
+    } catch (e) {
+      console.error(e);
+      throw new Error(/download|fetch|network|import|load/i.test(e.message)
+        ? 'Couldn’t load the separation model. Check your connection and try again.'
+        : 'Separation failed on this device (' + e.message + ')');
+    }
+    if (item.removed) return;
+    item.backend = res.backend;
+
+    // Vocals come from the model; music is whatever is left of the mix.
+    const n = buf.length;
+    let vocals, music;
+    if (stereo) {
+      const mL = new Float32Array(n), mR = new Float32Array(n);
+      for (let i = 0; i < n; i++) { mL[i] = mixL[i] - res.left[i]; mR[i] = mixR[i] - res.right[i]; }
+      vocals = [res.left, res.right]; music = [mL, mR];
+    } else {
+      const v = new Float32Array(n), m = new Float32Array(n);
+      for (let i = 0; i < n; i++) { v[i] = (res.left[i] + res.right[i]) / 2; m[i] = mixL[i] - v[i]; }
+      vocals = [v]; music = [m];
+    }
+    const [vt, mt] = item.tracks;
+    for (const [track, chans] of [[vt, vocals], [mt, music]]) {
+      track.sampleRate = STEM_RATE;
+      track.length = n;
+      track.peaks = computePeaks(chans[0], PEAK_COLS);
+      track.blob = encodeWav(chans, STEM_RATE);
+    }
+    normalizePeaks([vt.peaks, mt.peaks]);   // one scale for both, so their relative loudness shows
+    item.meta = fmtTime(n / STEM_RATE) + ' · Vocals and music separated';
   }
 
   // ---------- zip (stored, no compression — WAV barely compresses anyway) ----------
@@ -354,14 +753,15 @@
 
   // ---------- list ----------
 
-  function addFiles(files) {
+  function addFiles(files, kind = mode) {
     if (!files.length) return;
     for (const file of files) {
       const item = {
-        id: nextId++, file, base: file.name.replace(/\.[^.]+$/, '') || 'audio',
-        status: 'queued', meta: null, peaks: null, cuts: [], segs: [], blob: null, url: null, audio: null, playFrac: 0,
+        id: nextId++, file, kind, status: 'queued', meta: '', note: '', progress: null, error: '',
+        tracks: outputNames(file.name.replace(/\.[^.]+$/, '') || 'audio', MODES[kind].tracks)
+          .map((outName, i) => ({ ...MODES[kind].tracks[i], outName, peaks: null, cuts: [], segs: null, length: 0, sampleRate: 0, blob: null, url: null, audio: null, playFrac: 0 })),
       };
-      item.outName = uniqueName(item.base);
+      for (const track of item.tracks) track.item = item;
       item.el = buildRow(item);
       items.push(item);
       $('list').append(item.el);
@@ -372,11 +772,12 @@
   }
 
   // Two inputs with the same name must not overwrite each other in the zip.
-  function uniqueName(base) {
-    const taken = new Set(items.map(i => i.outName));
-    let name = base + SUFFIX;
-    for (let n = 2; taken.has(name); n++) name = base + ' (' + n + ')' + SUFFIX;
-    return name;
+  function outputNames(base, specs) {
+    const taken = new Set(items.flatMap(i => i.tracks.map(t => t.outName)));
+    for (let n = 1; ; n++) {
+      const names = specs.map(s => base + (n > 1 ? ' (' + n + ')' : '') + s.suffix);
+      if (!names.some(name => taken.has(name))) return names;
+    }
   }
 
   function buildRow(item) {
@@ -384,28 +785,39 @@
     el.className = 'row entering';
     el.innerHTML =
       '<div class="body">' +
-        '<button class="icon-btn play" type="button"></button>' +
-        '<div class="text"><div class="name"></div><div class="meta"></div></div>' +
-        '<button class="icon-btn save" type="button">' + ICON.down + '</button>' +
-        '<button class="icon-btn quiet remove" type="button" aria-label="Remove">' + ICON.close + '</button>' +
-        '<canvas></canvas>' +
+        '<div class="head"><span class="spinner"></span>' +
+          '<div class="text"><div class="name"></div><div class="meta"></div></div>' +
+          '<button class="icon-btn quiet remove" type="button" aria-label="Remove">' + ICON.close + '</button></div>' +
+        '<div class="progress" hidden><i></i></div>' +
+        '<div class="tracks"></div>' +
       '</div>';
     el.querySelector('.name').textContent = item.file.name;
-    el.querySelector('.save').setAttribute('aria-label', 'Download ' + item.outName);
-    el.querySelector('.save').title = item.outName;
-    el.querySelector('.play').addEventListener('click', () => togglePlay(item));
-    el.querySelector('.save').addEventListener('click', () => saveBlob(item.blob, item.outName));
     el.querySelector('.remove').addEventListener('click', () => removeItem(item));
+    for (const track of item.tracks) {
+      const t = document.createElement('div');
+      t.className = 'track';
+      t.innerHTML = '<button class="icon-btn play" type="button"></button>' +
+        '<div class="lane">' + (track.label ? '<span class="label"></span>' : '') + '<canvas></canvas></div>' +
+        '<button class="icon-btn save" type="button">' + ICON.down + '</button>';
+      if (track.label) t.querySelector('.label').textContent = track.label;
+      const save = t.querySelector('.save');
+      save.setAttribute('aria-label', 'Download ' + track.outName);
+      save.title = track.outName;
+      save.addEventListener('click', () => saveBlob(track.blob, track.outName));
+      t.querySelector('.play').addEventListener('click', () => togglePlay(track));
+      track.el = t;
+      wireScrub(track, t.querySelector('canvas'));
+      el.querySelector('.tracks').append(t);
+    }
     el.addEventListener('animationend', () => el.classList.remove('entering'), { once: true });
-    wireScrub(item, el.querySelector('canvas'));
     return el;
   }
 
   function removeItem(item) {
-    if (playing === item) stopPlayback();
+    if (playing && playing.item === item) stopPlayback();
     items = items.filter(i => i !== item);
     item.removed = true;
-    if (item.url) URL.revokeObjectURL(item.url);
+    for (const track of item.tracks) if (track.url) URL.revokeObjectURL(track.url);
     refresh();
     const el = item.el;
     if (reducedMotion.matches || !items.length) return el.remove();
@@ -418,35 +830,27 @@
   }
 
   function paint(item) {
-    const el = item.el, play = el.querySelector('.play'), meta = el.querySelector('.meta');
-    el.classList.toggle('done', item.status === 'done');
+    const el = item.el, done = item.status === 'done', busy = item.status === 'processing';
+    el.classList.toggle('done', done);
     el.classList.toggle('error', item.status === 'error');
-    el.querySelector('.save').disabled = item.status !== 'done';
-
-    if (item.status === 'done') {
-      const sr = item.meta.sampleRate, dur = item.meta.length / sr;
-      const cut = item.cuts.reduce((n, [s, e]) => n + (e - s), 0) / sr;
-      meta.textContent = fmtTime(dur) + ' → ' + fmtTime(dur - cut) + ' · ' +
-        (item.cuts.length ? item.cuts.length + (item.cuts.length === 1 ? ' pause removed' : ' pauses removed') : 'No pauses found');
-      play.disabled = false;
-      play.innerHTML = playing === item ? ICON.pause : ICON.play;
-      play.setAttribute('aria-label', playing === item ? 'Pause' : 'Play result');
-    } else if (item.status === 'error') {
-      meta.textContent = 'This file couldn’t be read as audio';
-      play.disabled = true; play.innerHTML = ICON.alert; play.style.color = 'var(--danger)';
-      play.setAttribute('aria-label', 'Failed');
-    } else {
-      meta.textContent = item.status === 'processing' ? 'Removing pauses…' : 'Waiting';
-      play.disabled = true;
-      play.innerHTML = item.status === 'processing' ? '<span class="spinner"></span>' : ICON.play;
-      play.setAttribute('aria-label', meta.textContent);
+    el.classList.toggle('processing', busy);
+    el.querySelector('.meta').textContent =
+      done ? item.meta : item.status === 'error' ? item.error : busy ? item.note : 'Waiting';
+    const bar = el.querySelector('.progress');
+    bar.hidden = !(busy && item.progress != null);
+    if (item.progress != null) bar.firstChild.style.width = (item.progress * 100).toFixed(1) + '%';
+    for (const track of item.tracks) {
+      const play = track.el.querySelector('.play'), on = playing === track;
+      play.disabled = track.el.querySelector('.save').disabled = !done;
+      play.innerHTML = on ? ICON.pause : ICON.play;
+      play.setAttribute('aria-label', (on ? 'Pause ' : 'Play ') + (track.label || 'result'));
+      drawWave(track);
     }
-    drawWave(item);
   }
 
-  // Waveform of the original, with the removed stretches dimmed and the played part tinted.
-  function drawWave(item) {
-    const cv = item.el.querySelector('canvas');
+  // Waveform as bars; removed stretches are dimmed and the played part is tinted.
+  function drawWave(track) {
+    const cv = track.el.querySelector('canvas');
     const w = cv.clientWidth, h = cv.clientHeight;
     if (!w || !h) return;
     const dpr = window.devicePixelRatio || 1;
@@ -460,18 +864,14 @@
     let ci = 0;
     for (let j = 0; j < n; j++) {
       let amp = 0;
-      if (item.peaks) {
+      if (track.peaks) {
         const a = Math.floor(j * PEAK_COLS / n), b = Math.max(a + 1, Math.floor((j + 1) * PEAK_COLS / n));
-        for (let x = a; x < b; x++) if (item.peaks[x] > amp) amp = item.peaks[x];
+        for (let x = a; x < b; x++) if (track.peaks[x] > amp) amp = track.peaks[x];
       }
-      const frac = (j + 0.5) / n;
-      let cut = false;
-      if (item.meta) {
-        const pos = frac * item.meta.length;
-        while (ci < item.cuts.length && item.cuts[ci][1] <= pos) ci++;
-        cut = ci < item.cuts.length && item.cuts[ci][0] <= pos;
-      }
-      g.fillStyle = cut ? cCut : frac <= item.playFrac ? cPlayed : cKept;
+      const frac = (j + 0.5) / n, pos = frac * track.length;
+      while (ci < track.cuts.length && track.cuts[ci][1] <= pos) ci++;
+      const cut = ci < track.cuts.length && track.cuts[ci][0] <= pos;
+      g.fillStyle = cut ? cCut : frac <= track.playFrac ? cPlayed : cKept;
       const bh = Math.max(2, amp * h);
       g.beginPath();
       if (g.roundRect) g.roundRect(j * STEP, (h - bh) / 2, BAR, bh, 1); else g.rect(j * STEP, (h - bh) / 2, BAR, bh);
@@ -479,19 +879,29 @@
     }
   }
 
+  function setMode(next) {
+    mode = next;
+    for (const b of document.querySelectorAll('.seg button')) b.setAttribute('aria-selected', String(b.dataset.mode === mode));
+    $('heroTitle').textContent = MODES[mode].title;
+    $('heroText').textContent = MODES[mode].text;
+    $('heroNote').textContent = MODES[mode].note;
+    $('dropText').textContent = MODES[mode].drop;
+  }
+
   function refresh() {
     const empty = items.length === 0;
     $('hero').hidden = !empty;
-    $('app').hidden = empty;
-    const done = items.filter(i => i.status === 'done').length;
+    $('app').hidden = $('add').hidden = $('downloadAll').hidden = empty;
+    const done = items.filter(i => i.status === 'done');
     const failed = items.filter(i => i.status === 'error').length;
     const busy = items.some(i => i.status === 'queued' || i.status === 'processing');
-    $('summary').textContent = busy
-      ? 'Removing pauses · ' + done + ' of ' + items.length + ' done'
-      : done + (done === 1 ? ' file ready' : ' files ready') + (failed ? ' · ' + failed + ' failed' : '');
+    $('summary').textContent = empty ? '' : busy
+      ? 'Working · ' + done.length + ' of ' + items.length + ' done'
+      : done.length + (done.length === 1 ? ' file ready' : ' files ready') + (failed ? ' · ' + failed + ' failed' : '');
+    const outputs = done.reduce((n, i) => n + i.tracks.length, 0);
     const btn = $('downloadAll');
-    btn.disabled = busy || done === 0;
-    btn.textContent = done === 1 && !busy ? 'Download' : 'Download All';
+    btn.disabled = busy || outputs === 0;
+    btn.textContent = outputs === 1 && !busy ? 'Download' : 'Download All';
   }
 
   // ---------- processing queue: one file at a time, so memory stays bounded ----------
@@ -510,93 +920,90 @@
 
   async function processItem(item) {
     item.status = 'processing';
+    item.note = item.kind === 'stems' ? 'Preparing…' : 'Removing pauses…';
     paint(item); refresh();
     await tick();
-    let buf;
     try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      buf = await audioCtx.decodeAudioData(await item.file.arrayBuffer());
+      await (item.kind === 'stems' ? processStems : processPauses)(item);
     } catch (e) {
       item.status = 'error';
+      item.error = e.message;
       paint(item);
       return;
     }
-    const env = computeEnvelope(buf);
-    item.meta = { sampleRate: buf.sampleRate, length: buf.length };
-    item.peaks = computePeaks(buf, PEAK_COLS);
-    item.cuts = findCuts(buf.sampleRate, buf.length, env, autoThreshold(env));
-    item.segs = keptSegments(buf.length, item.cuts);
-    paint(item);
-    await tick();
-    const blob = renderWav(buf, item.segs);
     if (item.removed) return;
-    item.blob = blob;
-    item.url = URL.createObjectURL(blob);
+    for (const track of item.tracks) track.url = URL.createObjectURL(track.blob);
     item.status = 'done';
     paint(item);
   }
 
-  // ---------- playback: the result plays, the playhead skips over what was removed ----------
+  // ---------- playback: where pauses were removed, the playhead skips over them ----------
 
-  function outToOrig(item, sec) {
-    let s = sec * item.meta.sampleRate;
-    for (const [a, b] of item.segs) { if (s < b - a) return (a + s) / item.meta.length; s -= b - a; }
+  function outToOrig(track, sec) {
+    let s = sec * track.sampleRate;
+    if (!track.segs) return Math.min(1, s / track.length);
+    for (const [a, b] of track.segs) { if (s < b - a) return (a + s) / track.length; s -= b - a; }
     return 1;
   }
 
-  function origToOut(item, frac) {
-    const p = frac * item.meta.length;
+  function origToOut(track, frac) {
+    const p = frac * track.length;
+    if (!track.segs) return p / track.sampleRate;
     let acc = 0;
-    for (const [a, b] of item.segs) {
+    for (const [a, b] of track.segs) {
       if (p < a) break;
       if (p < b) { acc += p - a; break; }
       acc += b - a;
     }
-    return acc / item.meta.sampleRate;
+    return acc / track.sampleRate;
   }
 
-  function ensureAudio(item) {
-    if (item.audio) return item.audio;
-    item.audio = new Audio(item.url);
-    item.audio.addEventListener('ended', () => { if (playing === item) { stopPlayback(); item.playFrac = 0; drawWave(item); } });
-    return item.audio;
+  function ensureAudio(track) {
+    if (track.audio) return track.audio;
+    track.audio = new Audio(track.url);
+    track.audio.addEventListener('ended', () => { if (playing === track) { stopPlayback(); track.playFrac = 0; drawWave(track); } });
+    return track.audio;
   }
 
   function stopPlayback() {
-    const item = playing;
-    if (!item) return;
+    const track = playing;
+    if (!track) return;
     playing = null;
-    item.audio.pause();
-    if (!item.removed) paint(item);
+    track.audio.pause();
+    if (!track.item.removed) paint(track.item);
   }
 
-  function togglePlay(item) {
-    if (item.status !== 'done') return;
-    if (playing === item) return stopPlayback();
+  function togglePlay(track) {
+    if (track.item.status !== 'done') return;
+    if (playing === track) return stopPlayback();
+    // Switching between the stems of one file keeps your place, so they can be compared.
+    const from = playing && playing.item === track.item ? playing.audio.currentTime : null;
     stopPlayback();
-    playing = item;
-    ensureAudio(item).play();
-    paint(item);
+    playing = track;
+    const audio = ensureAudio(track);
+    if (from != null) audio.currentTime = from;
+    audio.play();
+    paint(track.item);
     requestAnimationFrame(function frame() {
-      if (playing !== item) return;
-      item.playFrac = outToOrig(item, item.audio.currentTime);
-      drawWave(item);
+      if (playing !== track) return;
+      track.playFrac = outToOrig(track, track.audio.currentTime);
+      drawWave(track);
       requestAnimationFrame(frame);
     });
   }
 
   // Scrubbing follows the pointer 1:1 from the moment it goes down.
-  function wireScrub(item, cv) {
+  function wireScrub(track, cv) {
     const seek = e => {
       const r = cv.getBoundingClientRect();
       const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-      const t = origToOut(item, frac);
-      ensureAudio(item).currentTime = t;
-      item.playFrac = outToOrig(item, t);
-      drawWave(item);
+      const t = origToOut(track, frac);
+      ensureAudio(track).currentTime = t;
+      track.playFrac = outToOrig(track, t);
+      drawWave(track);
     };
     cv.addEventListener('pointerdown', e => {
-      if (item.status !== 'done') return;
+      if (track.item.status !== 'done') return;
       cv.setPointerCapture(e.pointerId);
       seek(e);
       cv.addEventListener('pointermove', seek);
@@ -616,13 +1023,13 @@
   }
 
   async function downloadAll() {
-    const done = items.filter(i => i.status === 'done');
-    if (!done.length) return;
-    if (done.length === 1) return saveBlob(done[0].blob, done[0].outName);
+    const outputs = items.filter(i => i.status === 'done').flatMap(i => i.tracks);
+    if (!outputs.length) return;
+    if (outputs.length === 1) return saveBlob(outputs[0].blob, outputs[0].outName);
     const btn = $('downloadAll');
     btn.disabled = true; btn.textContent = 'Preparing…';
     await tick();
-    const zip = await makeZip(done.map(i => ({ name: i.outName, blob: i.blob })));
+    const zip = await makeZip(outputs.map(t => ({ name: t.outName, blob: t.blob })));
     saveBlob(zip, 'processed-audio.zip');
     refresh();
   }
@@ -635,6 +1042,7 @@
   $('add').addEventListener('click', choose);
   fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value = ''; });
   $('downloadAll').addEventListener('click', downloadAll);
+  for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => setMode(b.dataset.mode));
 
   // Files can be dropped anywhere in the window.
   let dragDepth = 0;
@@ -648,10 +1056,11 @@
     addFiles([...e.dataTransfer.files]);
   });
 
-  const redrawAll = () => items.forEach(drawWave);
+  const redrawAll = () => items.forEach(i => i.tracks.forEach(drawWave));
   window.addEventListener('resize', redrawAll);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
 
+  setMode(mode);
   refresh();
   window.pauseCutter = { addFiles, makeZip, items: () => items };   // handy for scripting from the console
 })();
